@@ -1,4 +1,8 @@
 use clap::Parser;
+use std::{
+    fs::File,
+    io::{BufRead, BufReader},
+};
 
 // Search for a pattern in a file and display the lines that contain it.
 #[derive(Parser)]
@@ -15,13 +19,17 @@ fn main() {
     //   $ cargo run --quiet -- main src/main.rs
 
     // Cli::parse() is meant to be used in our main(); don't use it in other places.
-    let args = Cli::parse();
+    let args: Cli = Cli::parse();
 
-    let content = std::fs::read_to_string(&args.path).expect("could not read file");
+    // BufReader.lines() reads a file more efficiently than std::fs::read_to_string().
+    let f: File = File::open(&args.path).expect("could not read file");
+    let reader: BufReader<File> = BufReader::new(f);
 
-    for line in content.lines() {
-        if line.contains(&args.pattern) {
-            println!("{}", line);
+    for line in reader.lines() {
+        let s: String = line.expect("could not read line");
+
+        if s.contains(&args.pattern) {
+            println!("{}", s);
         }
     }
 }
