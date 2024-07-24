@@ -12,11 +12,16 @@ struct Cli {
 
 fn main() {
     // Example
-    //   $ cargo run --quiet -- some-pattern some-file
-    //   pattern: "some-pattern", path: "some-file"
+    //   $ cargo run --quiet -- main src/main.rs
 
     // Cli::parse() is meant to be used in our main(); don't use it in other places.
     let args = Cli::parse();
 
-    println!("pattern: {:?}, path: {:?}", args.pattern, args.path);
+    let content = std::fs::read_to_string(&args.path).expect("could not read file");
+
+    for line in content.lines() {
+        if line.contains(&args.pattern) {
+            println!("{}", line);
+        }
+    }
 }
