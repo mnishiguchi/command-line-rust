@@ -14,7 +14,7 @@ struct Cli {
     path: std::path::PathBuf,
 }
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Example
     //   $ cargo run --quiet -- main src/main.rs
 
@@ -26,10 +26,18 @@ fn main() {
     let reader: BufReader<File> = BufReader::new(f);
 
     for line in reader.lines() {
-        let s: String = line.expect("could not read line");
+        let s: String = match line {
+            Ok(content) => content,
+            Err(error) => {
+                return Err(error.into());
+            }
+        };
 
         if s.contains(&args.pattern) {
             println!("{}", s);
         }
     }
+
+    // This means "Result is OK and has no content."
+    return Ok(());
 }
