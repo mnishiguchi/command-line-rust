@@ -14,6 +14,8 @@ struct Cli {
     path: std::path::PathBuf,
 }
 
+// Box<dyn std::error::Error> can contain any type that implements the standard Error trait. So we
+// can use `?` on all of the usual functions that return Results.
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Example
     //   $ cargo run --quiet -- main src/main.rs
@@ -22,16 +24,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Cli = Cli::parse();
 
     // BufReader.lines() reads a file more efficiently than std::fs::read_to_string().
-    let f: File = File::open(&args.path).expect("could not read file");
+    let f: File = File::open(&args.path)?;
     let reader: BufReader<File> = BufReader::new(f);
 
     for line in reader.lines() {
-        let s: String = match line {
-            Ok(content) => content,
-            Err(error) => {
-                return Err(error.into());
-            }
-        };
+        // With a question mark, Rust will internally expand the Result.
+        let s = line?;
 
         if s.contains(&args.pattern) {
             println!("{}", s);
