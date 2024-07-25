@@ -1,12 +1,10 @@
-use std::process::Command;
+use assert_cmd::Command;
 
 #[test]
 fn runs() {
-    let mut cmd: Command = Command::new("./target/debug/hello");
+    // Just call Result::unwrap because the binary should always be found.
+    let mut cmd: Command = Command::cargo_bin("hello").unwrap();
 
-    // Run the command and capture the output.
-    let res: Result<_, _> = cmd.output();
-
-    // Verify the result is an OK variant.
-    assert!(res.is_ok());
+    // Verify the command succeeds
+    cmd.assert().success();
 }
