@@ -39,5 +39,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // This means "Result is OK and has no content."
-    return Ok(());
+    // The last expression of any block in Rust is its return value.
+    Ok(())
 }
