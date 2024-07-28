@@ -1,0 +1,2 @@
+# Ignore tests because I copy from the book author's default tests
+/tests/
