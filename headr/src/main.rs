@@ -43,8 +43,19 @@ fn main() -> Result<()> {
 fn run(args: Args) -> Result<()> {
     for filename in args.files {
         match open_input_source(&filename) {
-            Err(e) => eprintln!("{filename}: {e}"),
-            Ok(_) => println!("Opened {filename}"),
+            Err(e) => {
+                eprintln!("{filename}: {e}");
+            }
+            Ok(f) => {
+                // Use Iterator::take to select the desired number of lines from the filehandle.
+                // Iterator::take expects its argument to be the type usize.
+                for line in f.lines().take(args.lines as usize) {
+                    // Shadow the line with the result of unpacking the Result.
+                    let line = line?;
+
+                    println!("{}", line);
+                }
+            }
         }
     }
 
