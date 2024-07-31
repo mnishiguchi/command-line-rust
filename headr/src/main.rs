@@ -46,14 +46,27 @@ fn run(args: Args) -> Result<()> {
             Err(e) => {
                 eprintln!("{filename}: {e}");
             }
-            Ok(f) => {
-                // Use Iterator::take to select the desired number of lines from the filehandle.
-                // Iterator::take expects its argument to be the type usize.
-                for line in f.lines().take(args.lines as usize) {
-                    // Shadow the line with the result of unpacking the Result.
-                    let line = line?;
+            // Accept the filehandle as a mutable value.
+            Ok(mut filehandle) => {
+                // Create a new empty mutable string buffer to hold each line.
+                let mut line = String::new();
 
-                    println!("{}", line);
+                // Iterate through a std::ops::Range to count up from zero to the requested number
+                // of lines.
+                for _ in 0..args.lines {
+                    // Read the next line into the string buffer.
+                    let bytes_read = filehandle.read_line(&mut line)?;
+
+                    // Break out of the loop when reaching the end of the file.
+                    if bytes_read == 0 {
+                        break;
+                    }
+
+                    // Print the line including the original line ending.
+                    print!("{line}");
+
+                    // Empty the line buffer.
+                    line.clear();
                 }
             }
         }
