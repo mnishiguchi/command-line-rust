@@ -48,25 +48,41 @@ fn run(args: Args) -> Result<()> {
             }
             // Accept the filehandle as a mutable value.
             Ok(mut filehandle) => {
-                // Create a new empty mutable string buffer to hold each line.
-                let mut line = String::new();
+                // Check if args.bytes is some number of bytes to read.
+                if let Some(byte_count) = args.bytes {
+                    // This branch is to support the BYTES option.
 
-                // Iterate through a std::ops::Range to count up from zero to the requested number
-                // of lines.
-                for _ in 0..args.lines {
-                    // Read the next line into the string buffer.
-                    let bytes_read = filehandle.read_line(&mut line)?;
+                    // Create a mutable buffer of a fixed length filled with zeros to hold the bytes
+                    // read from the file.
+                    let mut buffer = vec![0; byte_count as usize];
 
-                    // Break out of the loop when reaching the end of the file.
-                    if bytes_read == 0 {
-                        break;
+                    // The value will contain the number of bytes that were read, which can be
+                    // fewer than the number requested.
+                    let bytes_read = filehandle.read(&mut buffer)?;
+
+                    // Convert the selected bytes into a string, which can be invalid UTF-8.
+                    print!("{}", String::from_utf8_lossy(&buffer[..bytes_read]));
+                } else {
+                    // Create a new empty mutable string buffer to hold each line.
+                    let mut line = String::new();
+
+                    // Iterate through a std::ops::Range to count up from zero to the requested number
+                    // of lines.
+                    for _ in 0..args.lines {
+                        // Read the next line into the string buffer.
+                        let bytes_read = filehandle.read_line(&mut line)?;
+
+                        // Break out of the loop when reaching the end of the file.
+                        if bytes_read == 0 {
+                            break;
+                        }
+
+                        // Print the line including the original line ending.
+                        print!("{line}");
+
+                        // Empty the line buffer.
+                        line.clear();
                     }
-
-                    // Print the line including the original line ending.
-                    print!("{line}");
-
-                    // Empty the line buffer.
-                    line.clear();
                 }
             }
         }
