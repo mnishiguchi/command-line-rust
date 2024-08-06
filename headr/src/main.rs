@@ -57,14 +57,14 @@ fn run(args: Args) -> Result<()> {
                     // Read the desired number of bytes from a file. Be sure to add to our imports the trait
                     // std::io::Read. We must indicate that we want a Vec (size known), not a slice
                     // (size unknown).
-                    let bytes_read: Result<Vec<_>, _> = filehandle
+                    let bytes_read = filehandle
                         .bytes()
                         .take(requested_byte_count as usize)
-                        .collect();
+                        .collect::<Result<Vec<_>, _>>()?;
 
                     // Convert the selected bytes into a string, which can be invalid UTF-8.
                     // The size for bytes must be known at complile-time.
-                    print!("{}", String::from_utf8_lossy(&bytes_read?));
+                    print!("{}", String::from_utf8_lossy(&bytes_read));
                 } else {
                     // Create a new empty mutable string buffer to hold each line.
                     let mut line = String::new();
