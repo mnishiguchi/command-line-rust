@@ -1,7 +1,9 @@
 use anyhow::Result;
 use clap::Parser;
-use std::fs::File;
-use std::io::{self, BufRead, BufReader};
+use std::{
+    fs::File,
+    io::{self, BufRead, BufReader, Read},
+};
 
 /// Print the first 10 lines of each FILE to standard output.
 #[derive(Parser, Debug)]
@@ -49,19 +51,20 @@ fn run(args: Args) -> Result<()> {
             // Accept the filehandle as a mutable value.
             Ok(mut filehandle) => {
                 // Check if args.bytes is some number of bytes to read.
-                if let Some(byte_count) = args.bytes {
+                if let Some(requested_byte_count) = args.bytes {
                     // This branch is to support the BYTES option.
 
-                    // Create a mutable buffer of a fixed length filled with zeros to hold the bytes
-                    // read from the file.
-                    let mut buffer = vec![0; byte_count as usize];
-
-                    // The value will contain the number of bytes that were read, which can be
-                    // fewer than the number requested.
-                    let bytes_read = filehandle.read(&mut buffer)?;
+                    // Read the desired number of bytes from a file. Be sure to add to our imports the trait
+                    // std::io::Read. We must indicate that we want a Vec (size known), not a slice
+                    // (size unknown).
+                    let bytes_read: Result<Vec<_>, _> = filehandle
+                        .bytes()
+                        .take(requested_byte_count as usize)
+                        .collect();
 
                     // Convert the selected bytes into a string, which can be invalid UTF-8.
-                    print!("{}", String::from_utf8_lossy(&buffer[..bytes_read]));
+                    // The size for bytes must be known at complile-time.
+                    print!("{}", String::from_utf8_lossy(&bytes_read?));
                 } else {
                     // Create a new empty mutable string buffer to hold each line.
                     let mut line = String::new();
