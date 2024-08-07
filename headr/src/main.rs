@@ -25,7 +25,8 @@ struct Args {
     /// Number of bytes
     #[arg(
       short = 'c',
-      long, conflicts_with = "lines",
+      long,
+      conflicts_with = "lines",
       value_parser = clap::value_parser!(u64).range(1..),
     )]
     bytes: Option<u64>,
@@ -43,13 +44,21 @@ fn main() -> Result<()> {
 }
 
 fn run(args: Args) -> Result<()> {
-    for filename in args.files {
+    let file_count = args.files.len();
+
+    for (file_index, filename) in args.files.iter().enumerate() {
         match open_input_source(&filename) {
             Err(e) => {
                 eprintln!("{filename}: {e}");
             }
             // Accept the filehandle as a mutable value.
             Ok(mut filehandle) => {
+                // Only print headers when there are multiple files.
+                if file_count > 1 {
+                    let linebreak = if file_index > 0 { "\n" } else { "" };
+                    println!("{linebreak}==> {filename} <==")
+                }
+
                 // Check if args.bytes is some number of bytes to read.
                 if let Some(requested_byte_count) = args.bytes {
                     // This branch is to support the BYTES option.
