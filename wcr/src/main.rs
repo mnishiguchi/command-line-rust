@@ -39,7 +39,21 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn run(args: Args) -> Result<()> {
+fn run(mut args: Args) -> Result<()> {
+    // Check if all the flags are false
+    let are_all_flags_false = [args.words, args.bytes, args.chars, args.lines]
+        // Create an iterator.
+        .iter()
+        // Compare to &false because the values are references.
+        .all(|v| v == &false);
+
+    // Assign default settings if all flags are false.
+    if are_all_flags_false {
+        args.lines = true;
+        args.words = true;
+        args.bytes = true;
+    }
+
     println!("{args:#?}");
 
     Ok(())
