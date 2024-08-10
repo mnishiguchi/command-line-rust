@@ -64,8 +64,6 @@ fn run(mut args: Args) -> Result<()> {
         args.bytes = true;
     }
 
-    println!("{args:#?}");
-
     for filename in &args.files {
         match open_input_source(filename) {
             Err(e) => {
@@ -73,7 +71,15 @@ fn run(mut args: Args) -> Result<()> {
             }
             Ok(filehandle) => {
                 let file_info = get_file_info(filehandle)?;
-                println!("{file_info:?}");
+
+                // Format the values into a right-justified field eight characters wide.
+                println!(
+                    "{:>8}{:>8}{:>8} {}",
+                    file_info.line_count,
+                    file_info.word_count,
+                    file_info.byte_count,
+                    filename
+                );
             }
         }
     }

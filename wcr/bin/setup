@@ -27,7 +27,6 @@ printf "\n%s\n" "==> Copy necessary code from the example project"
   cd "${td}" &&
     git sparse-checkout add "${project_subdir}" &&
     cd "${project_subdir}" &&
-    ./mk-outs.sh &&
     mv -iv ./tests/* "${tests_dest}"
 )
 
