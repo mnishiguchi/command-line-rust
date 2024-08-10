@@ -1,5 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
+use std::fs::File;
+use std::io::{self, BufRead, BufReader};
 
 /// Print newline, word, and byte counts for each FILE, and a total line if more than one FILE is
 /// specified.  A word is a non-zero-length sequence of printable characters delimited by white
@@ -56,5 +58,32 @@ fn run(mut args: Args) -> Result<()> {
 
     println!("{args:#?}");
 
+    for filename in &args.files {
+        match open_input_source(filename) {
+            Err(e) => {
+                eprintln!("{filename}: {e}")
+            }
+            Ok(_) => {
+                println!("Opened {filename}")
+            }
+        }
+    }
+
     Ok(())
+}
+
+// Accepts a filename and returns either an error or a boxed value that implements the BufRead
+// trait.
+// - The return type includes the dyn keyword to say that the return type's trait is dynamically
+// dispatched. This allows us to abstract the idea of the input source.
+// - The return type is placed into a Box. which is a way to store a value on the heap. The
+// compiler does not have enough information from dyn BufRead to know the size of the return type.
+// If a variable does not have a fixed known size, then Rust cannot store it on the stack. The
+// solution is to instead allocate memory on the heap by putting the return value into a Box, which
+// is a pointer with a known size.
+fn open_input_source(filename: &str) -> Result<Box<dyn BufRead>> {
+    match filename {
+        "-" => Ok(Box::new(BufReader::new(io::stdin()))),
+        _ => Ok(Box::new(BufReader::new(File::open(filename)?))),
+    }
 }
