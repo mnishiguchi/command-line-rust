@@ -64,6 +64,12 @@ fn run(mut args: Args) -> Result<()> {
         args.bytes = true;
     }
 
+    // Initialize total counters.
+    let mut total_lines = 0;
+    let mut total_words = 0;
+    let mut total_bytes = 0;
+    let mut total_chars = 0;
+
     for filename in &args.files {
         match open_input_source(filename) {
             Err(e) => {
@@ -72,16 +78,38 @@ fn run(mut args: Args) -> Result<()> {
             Ok(filehandle) => {
                 let file_info = get_file_info(filehandle)?;
 
-                // Format the values into a right-justified field eight characters wide.
                 println!(
-                    "{:>8}{:>8}{:>8} {}",
-                    file_info.line_count,
-                    file_info.word_count,
-                    file_info.byte_count,
-                    filename
+                    "{}{}{}{}{}",
+                    format_field(file_info.line_count, args.lines),
+                    format_field(file_info.word_count, args.words),
+                    format_field(file_info.byte_count, args.bytes),
+                    format_field(file_info.char_count, args.chars),
+                    if filename == "-" {
+                        String::from("")
+                    } else {
+                        format!(" {filename}")
+                    },
                 );
+
+                // Update total counters.
+                total_lines += file_info.line_count;
+                total_words += file_info.word_count;
+                total_bytes += file_info.byte_count;
+                total_chars += file_info.char_count;
             }
         }
+    }
+
+    let should_print_totals = args.files.len() > 1;
+
+    if should_print_totals {
+        println!(
+            "{}{}{}{} total",
+            format_field(total_lines, args.lines),
+            format_field(total_words, args.words),
+            format_field(total_bytes, args.bytes),
+            format_field(total_chars, args.chars),
+        )
     }
 
     Ok(())
@@ -141,6 +169,15 @@ fn get_file_info(mut filehandle: impl BufRead) -> Result<FileInfo> {
     })
 }
 
+// Format the values into a right-justified field eight characters wide.
+fn format_field(value: usize, show: bool) -> String {
+    if show {
+        format!("{:>8}", value)
+    } else {
+        String::from("")
+    }
+}
+
 // Unit tests
 //
 // The cfg(test) enables conditional compilation, so this module will be compiled only when
@@ -169,5 +206,17 @@ mod tests {
                 byte_count: 48,
             }
         );
+    }
+
+    #[test]
+    fn test_format_field() {
+        // Should return the empty string when show is false.
+        assert_eq!(format_field(1, false), "");
+
+        // Formatting for a single-digit number.
+        assert_eq!(format_field(3, true), "       3");
+
+        // Formatting for a double-digit number.
+        assert_eq!(format_field(10, true), "      10");
     }
 }
