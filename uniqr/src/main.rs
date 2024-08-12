@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use clap::Parser;
 use std::{
     fs::File,
-    io::{self, BufRead, BufReader},
+    io::{self, BufRead, BufReader, Write},
 };
 
 /// Report or omit repeated lines
@@ -35,27 +35,36 @@ fn main() -> Result<()> {
 
 fn do_run(args: Args) -> Result<()> {
     // Create an informative error message on failure.
-    let mut filehandle =
-        open_input_source(&args.in_file).map_err(|e| anyhow!("{}: {}", args.in_file, e))?;
+    let mut in_filehandle =
+        open_input_file(&args.in_file).map_err(|e| anyhow!("{}: {}", args.in_file, e))?;
 
-    let print_info_row = |n: u64, s: &str| {
+    let mut out_filehandle: Box<dyn Write> =
+        open_output_file(&args.out_file).map_err(|e| anyhow!("{:?}: {}", args.out_file, e))?;
+
+    // This closure must be declared as mutable because the out_filehandle is borrowed as a mutable
+    // value.
+    let mut print_info_row = |n: u64, s: &str| -> Result<()> {
         // Print the output only when count is greater than 0.
         if n > 0 {
             if args.count {
-                print!("{:>4} {}", n, s);
+                write!(out_filehandle, "{:>4} {}", n, s)?;
             } else {
-                print!("{}", s);
+                write!(out_filehandle, "{}", s)?;
             }
         }
+
+        Ok(())
     };
 
+    // These buffers allow us to only allocate memory for the current and previout lines so our
+    // program can scale to any file size.
     let mut current_line = String::new();
     let mut previous_line = String::new();
     let mut duplicate_count: u64 = 0;
 
     // Read lines of text from an input file or STDIN, preserving the line endings.
     loop {
-        let bytes_read = filehandle.read_line(&mut current_line)?;
+        let bytes_read = in_filehandle.read_line(&mut current_line)?;
 
         if bytes_read == 0 {
             break;
@@ -64,7 +73,7 @@ fn do_run(args: Args) -> Result<()> {
         let is_different_from_previous = current_line.trim_end() != previous_line.trim_end();
 
         if is_different_from_previous {
-            print_info_row(duplicate_count, &previous_line);
+            print_info_row(duplicate_count, &previous_line)?;
             previous_line = current_line.clone();
             duplicate_count = 0;
         }
@@ -73,14 +82,21 @@ fn do_run(args: Args) -> Result<()> {
         current_line.clear();
     }
 
-    print_info_row(duplicate_count, &previous_line);
+    print_info_row(duplicate_count, &previous_line)?;
 
     Ok(())
 }
 
-fn open_input_source(filename: &str) -> Result<Box<dyn BufRead>> {
+fn open_input_file(filename: &str) -> Result<Box<dyn BufRead>> {
     match filename {
         "-" => Ok(Box::new(BufReader::new(io::stdin()))),
-        _ => Ok(Box::new(BufReader::new(File::open(filename)?))),
+        path => Ok(Box::new(BufReader::new(File::open(path)?))),
+    }
+}
+
+fn open_output_file(filename: &Option<String>) -> Result<Box<dyn Write>> {
+    match filename {
+        None => Ok(Box::new(io::stdout())),
+        Some(path) => Ok(Box::new(File::create(path)?)),
     }
 }
