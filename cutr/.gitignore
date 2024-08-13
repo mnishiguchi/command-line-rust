@@ -1,0 +1,2 @@
+# Ignore tests because I want to copy them from the example project.
+/tests/
