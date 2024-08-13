@@ -67,36 +67,45 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn do_run(args: Args) -> anyhow::Result<()> {
+    let type_filter = |walkdir_entry: &walkdir::DirEntry| -> bool {
+        args.entry_types.is_empty()
+            || args.entry_types.iter().any(|entry_type| match entry_type {
+                EntryType::Link => walkdir_entry.file_type().is_symlink(),
+                EntryType::Dir => walkdir_entry.file_type().is_dir(),
+                EntryType::File => walkdir_entry.file_type().is_file(),
+            })
+    };
+
+    let name_filter = |walkdir_entry: &walkdir::DirEntry| -> bool {
+        args.names.is_empty()
+            || args
+                .names
+                .iter()
+                .any(|name_regex| name_regex.is_match(&walkdir_entry.file_name().to_string_lossy()))
+    };
+
     for path in args.paths {
-        for walkdir_entry in WalkDir::new(path) {
-            match walkdir_entry {
-                Err(e) => {
-                    // Skip bad directories by not propagating errors.
-                    eprintln!("{e}");
-                }
-                Ok(walkdir_entry) => {
-                    let is_desired_entry_type = || {
-                        args.entry_types.iter().any(|entry_type| match entry_type {
-                            EntryType::Link => walkdir_entry.file_type().is_symlink(),
-                            EntryType::Dir => walkdir_entry.file_type().is_dir(),
-                            EntryType::File => walkdir_entry.file_type().is_file(),
-                        })
-                    };
-
-                    let is_desired_name = || {
-                        args.names.iter().any(|name_regex| {
-                            name_regex.is_match(&walkdir_entry.file_name().to_string_lossy())
-                        })
-                    };
-
-                    if (args.entry_types.is_empty() || is_desired_entry_type())
-                        && (args.names.is_empty() || is_desired_name())
-                    {
-                        println!("{}", walkdir_entry.path().display());
+        let filtered_entries: Vec<_> = WalkDir::new(path)
+            .into_iter()
+            .filter_map(
+                |walkdir_entry: Result<walkdir::DirEntry, _>| match walkdir_entry {
+                    Err(e) => {
+                        // Skip bad directories by not propagating errors.
+                        eprintln!("{e}");
+                        None
                     }
-                }
-            }
-        }
+                    Ok(walkdir_entry) => {
+                        // Keep this entry in the list.
+                        Some(walkdir_entry)
+                    }
+                },
+            )
+            .filter(type_filter)
+            .filter(name_filter)
+            .map(|walkdir_entry| walkdir_entry.path().display().to_string())
+            .collect();
+
+        println!("{}", filtered_entries.join("\n"));
     }
 
     Ok(())
