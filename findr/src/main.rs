@@ -1,4 +1,5 @@
 use clap::Parser;
+use walkdir::WalkDir;
 
 /// Search for files in a directory hierarchy.
 #[derive(Parser, Debug, Clone)]
@@ -66,7 +67,19 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn do_run(args: Args) -> anyhow::Result<()> {
-    println!("{:?}", args);
+    for path in args.paths {
+        for entry in WalkDir::new(path) {
+            match entry {
+                Err(e) => {
+                    // Skip bad directories by not propagating errors.
+                    eprintln!("{e}");
+                }
+                Ok(entry) => {
+                    println!("{}", entry.path().display());
+                }
+            }
+        }
+    }
 
     Ok(())
 }
