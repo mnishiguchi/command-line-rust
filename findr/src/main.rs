@@ -83,7 +83,15 @@ fn do_run(args: Args) -> anyhow::Result<()> {
                         })
                     };
 
-                    if args.entry_types.is_empty() || is_desired_entry_type() {
+                    let is_desired_name = || {
+                        args.names.iter().any(|name_regex| {
+                            name_regex.is_match(&walkdir_entry.file_name().to_string_lossy())
+                        })
+                    };
+
+                    if (args.entry_types.is_empty() || is_desired_entry_type())
+                        && (args.names.is_empty() || is_desired_name())
+                    {
                         println!("{}", walkdir_entry.path().display());
                     }
                 }
