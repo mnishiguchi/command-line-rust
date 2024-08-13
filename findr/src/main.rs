@@ -68,14 +68,24 @@ fn main() -> anyhow::Result<()> {
 
 fn do_run(args: Args) -> anyhow::Result<()> {
     for path in args.paths {
-        for entry in WalkDir::new(path) {
-            match entry {
+        for walkdir_entry in WalkDir::new(path) {
+            match walkdir_entry {
                 Err(e) => {
                     // Skip bad directories by not propagating errors.
                     eprintln!("{e}");
                 }
-                Ok(entry) => {
-                    println!("{}", entry.path().display());
+                Ok(walkdir_entry) => {
+                    let is_desired_entry_type = || {
+                        args.entry_types.iter().any(|entry_type| match entry_type {
+                            EntryType::Link => walkdir_entry.file_type().is_symlink(),
+                            EntryType::Dir => walkdir_entry.file_type().is_dir(),
+                            EntryType::File => walkdir_entry.file_type().is_file(),
+                        })
+                    };
+
+                    if args.entry_types.is_empty() || is_desired_entry_type() {
+                        println!("{}", walkdir_entry.path().display());
+                    }
                 }
             }
         }
