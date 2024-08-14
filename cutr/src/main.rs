@@ -1,4 +1,3 @@
-use anyhow::Result;
 use clap::Parser;
 
 /// Remove sections from each line of files.
@@ -34,7 +33,7 @@ struct SelectionArguments {
     chars: Option<String>,
 }
 
-fn main() -> Result<()> {
+fn main() -> anyhow::Result<()> {
     let args = CliArguments::parse();
 
     if let Err(e) = do_run(args) {
@@ -45,8 +44,20 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn do_run(args: CliArguments) -> Result<()> {
-    println!("{:#?}", args);
+fn do_run(args: CliArguments) -> anyhow::Result<()> {
+    // Break the delimiter string into a vector of u8.
+    let delimiter_as_bytes: &[u8] = args.delimiter.as_bytes();
+
+    if delimiter_as_bytes.len() != 1 {
+        // Use a raw string so the contained double quotes do not require excaping.
+        anyhow::bail!(r#"--delim "{}" must be a single byte"#, args.delimiter);
+    }
+
+    // Get the first byte. It is safe to call Option::unwrap because we have verified that this
+    // vector has exactly one byte.
+    let delimiter_byte: &u8 = delimiter_as_bytes.first().unwrap();
+
+    println!("{}", *delimiter_byte);
 
     Ok(())
 }
