@@ -61,7 +61,6 @@ fn main() {
     }
 }
 
-// TODO: Try to understand this
 fn do_run(args: CliArguments) -> anyhow::Result<()> {
     // Break the delimiter string into a vector of u8.
     let delimiter_bytes: &[u8] = args.delimiter.as_bytes();
@@ -77,25 +76,27 @@ fn do_run(args: CliArguments) -> anyhow::Result<()> {
     let delimiter_byte: &u8 = delimiter_byte.unwrap();
     let delimiter_byte: u8 = *delimiter_byte;
 
-    let parsed_field_position: Option<anyhow::Result<PositionList>> =
-        args.selection_arguments.fields.map(parse_position);
-    let parsed_byte_position: Option<anyhow::Result<PositionList>> =
-        args.selection_arguments.bytes.map(parse_position);
-    let parsed_char_position: Option<anyhow::Result<PositionList>> =
-        args.selection_arguments.chars.map(parse_position);
+    let parsed_position_lists = (
+        args.selection_arguments
+            .fields
+            .map(parse_position)
+            .transpose()?,
+        args.selection_arguments
+            .bytes
+            .map(parse_position)
+            .transpose()?,
+        args.selection_arguments
+            .chars
+            .map(parse_position)
+            .transpose()?,
+    );
 
-    let selection_mode: SelectionMode =
-        // Option::transpose with ? allows us to remove Result from the value, propagating a
-        // possible error.
-        if let Some(position_list) = parsed_field_position.transpose()? {
-            SelectionMode::Fields(position_list)
-        } else if let Some(position_list) = parsed_byte_position.transpose()? {
-            SelectionMode::Bytes(position_list)
-        } else if let Some(position_list) = parsed_char_position.transpose()? {
-            SelectionMode::Chars(position_list)
-        } else {
-            unreachable!("Must have --fields, --bytes, or --chars");
-        };
+    let selection_mode: SelectionMode = match parsed_position_lists {
+        (Some(position_list), _, _) => SelectionMode::Fields(position_list),
+        (_, Some(position_list), _) => SelectionMode::Bytes(position_list),
+        (_, _, Some(position_list)) => SelectionMode::Chars(position_list),
+        _ => unreachable!("Must have --fields, --bytes, or --chars"),
+    };
 
     for filename in &args.files {
         match open_input_file(filename) {
