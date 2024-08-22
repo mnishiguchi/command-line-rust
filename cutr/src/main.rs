@@ -98,45 +98,6 @@ fn do_run(args: CliArguments) -> anyhow::Result<()> {
         _ => unreachable!("Must have --fields, --bytes, or --chars"),
     };
 
-    let handle_field_selection =
-        |filehandle: Box<dyn BufRead>, position_list: &[Range<usize>]| -> anyhow::Result<_> {
-            let mut csv_reader = csv::ReaderBuilder::new()
-                .delimiter(delimiter_byte)
-                .has_headers(false)
-                .from_reader(filehandle);
-
-            let mut csv_writer = csv::WriterBuilder::new()
-                .delimiter(delimiter_byte)
-                .from_writer(io::stdout());
-
-            for record in csv_reader.records() {
-                let record: csv::StringRecord = record?;
-                csv_writer.write_record(extract_fields(&record, position_list))?;
-            }
-
-            Ok(())
-        };
-
-    let handle_byte_selection =
-        |filehandle: Box<dyn BufRead>, position_list: &[Range<usize>]| -> anyhow::Result<_> {
-            for line in filehandle.lines() {
-                let line: &str = &line?;
-                println!("{}", extract_bytes(&line, position_list));
-            }
-
-            Ok(())
-        };
-
-    let handle_char_selection =
-        |filehandle: Box<dyn BufRead>, position_list: &[Range<usize>]| -> anyhow::Result<_> {
-            for line in filehandle.lines() {
-                let line: &str = &line?;
-                println!("{}", extract_chars(&line, position_list));
-            }
-
-            Ok(())
-        };
-
     for filename in &args.files {
         match open_input_file(filename) {
             Err(e) => {
@@ -146,13 +107,13 @@ fn do_run(args: CliArguments) -> anyhow::Result<()> {
             Ok(filehandle) => {
                 match &selection_mode {
                     SelectionMode::Fields(position_list) => {
-                        handle_field_selection(filehandle, position_list)?
+                        print_selected_fields(filehandle, position_list, delimiter_byte)?
                     }
                     SelectionMode::Bytes(position_list) => {
-                        handle_byte_selection(filehandle, position_list)?
+                        print_selected_bytes(filehandle, position_list)?
                     }
                     SelectionMode::Chars(position_list) => {
-                        handle_char_selection(filehandle, position_list)?
+                        print_selected_chars(filehandle, position_list)?
                     }
                 };
             }
@@ -162,7 +123,7 @@ fn do_run(args: CliArguments) -> anyhow::Result<()> {
     Ok(())
 }
 
-// ## Helpers
+// Opening user-provided input source
 
 fn open_input_file(filename: &str) -> anyhow::Result<Box<dyn BufRead>> {
     match filename {
@@ -170,6 +131,8 @@ fn open_input_file(filename: &str) -> anyhow::Result<Box<dyn BufRead>> {
         path => Ok(Box::new(BufReader::new(File::open(path)?))),
     }
 }
+
+// Parsing user-provided position text
 
 /// Parses comma-delimited position entries. The entry can be either single digit or hyphenated
 /// range.
@@ -253,21 +216,24 @@ fn parse_index(index_text: &str) -> anyhow::Result<usize> {
     }
 }
 
-fn extract_fields(record: &csv::StringRecord, position_list: &[Range<usize>]) -> Vec<String> {
+// Extracting selected part from a line
+
+fn extract_fields_from_record(
+    record: &csv::StringRecord,
+    position_list: &[Range<usize>],
+) -> Vec<String> {
     // There is another way to write this function so that it will return a Vec<&str>, which will be
     // slightly more memory efficient as it won't make copies of strings. The trade off is that we
     // must indicate the lifetimes.
-    let selected: Vec<String> = position_list
+    position_list
         .iter()
         .cloned()
         .flat_map(|range| range.filter_map(|i| record.get(i)))
         .map(String::from)
-        .collect();
-
-    selected
+        .collect()
 }
 
-fn extract_bytes(line: &str, position_list: &[Range<usize>]) -> String {
+fn extract_bytes_from_line(line: &str, position_list: &[Range<usize>]) -> String {
     let bytes: &[u8] = line.as_bytes();
 
     // We use std::iter::Copied to create copies of the elements. The reason is that Iterator::get
@@ -289,20 +255,66 @@ fn extract_bytes(line: &str, position_list: &[Range<usize>]) -> String {
     selected
 }
 
-fn extract_chars(line: &str, position_list: &[Range<usize>]) -> String {
+fn extract_chars_from_line(line: &str, position_list: &[Range<usize>]) -> String {
     let chars: Vec<char> = line.chars().collect();
 
-    let selected: String = position_list
+    position_list
         .iter()
         .cloned()
         // Select the characters for each range in the position list.
         .flat_map(|range| range.filter_map(|i| chars.get(i)))
-        .collect();
-
-    selected
+        .collect()
 }
 
-// ## Unite testing
+// Printing selected part of the file
+
+fn print_selected_fields(
+    filehandle: Box<dyn BufRead>,
+    position_list: &[Range<usize>],
+    delimiter_byte: u8,
+) -> anyhow::Result<()> {
+    let mut csv_reader = csv::ReaderBuilder::new()
+        .delimiter(delimiter_byte)
+        .has_headers(false)
+        .from_reader(filehandle);
+
+    let mut csv_writer = csv::WriterBuilder::new()
+        .delimiter(delimiter_byte)
+        .from_writer(io::stdout());
+
+    for record in csv_reader.records() {
+        let record: csv::StringRecord = record?;
+        csv_writer.write_record(extract_fields_from_record(&record, position_list))?;
+    }
+
+    Ok(())
+}
+
+fn print_selected_bytes(
+    filehandle: Box<dyn BufRead>,
+    position_list: &[Range<usize>],
+) -> anyhow::Result<()> {
+    for line in filehandle.lines() {
+        let line: &str = &line?;
+        println!("{}", extract_bytes_from_line(&line, position_list));
+    }
+
+    Ok(())
+}
+
+fn print_selected_chars(
+    filehandle: Box<dyn BufRead>,
+    position_list: &[Range<usize>],
+) -> anyhow::Result<()> {
+    for line in filehandle.lines() {
+        let line: &str = &line?;
+        println!("{}", extract_chars_from_line(&line, position_list));
+    }
+
+    Ok(())
+}
+
+// Unit testing
 
 #[cfg(test)]
 mod unit_tests {
@@ -445,30 +457,54 @@ mod unit_tests {
     #[test]
     fn test_extract_fields() {
         let rec = csv::StringRecord::from(vec!["Captain", "Sham", "12345"]);
-        assert_eq!(extract_fields(&rec, &[0..1]), &["Captain"]);
-        assert_eq!(extract_fields(&rec, &[1..2]), &["Sham"]);
-        assert_eq!(extract_fields(&rec, &[0..1, 2..3]), &["Captain", "12345"]);
-        assert_eq!(extract_fields(&rec, &[0..1, 3..4]), &["Captain"]);
-        assert_eq!(extract_fields(&rec, &[1..2, 0..1]), &["Sham", "Captain"]);
+        assert_eq!(extract_fields_from_record(&rec, &[0..1]), &["Captain"]);
+        assert_eq!(extract_fields_from_record(&rec, &[1..2]), &["Sham"]);
+        assert_eq!(
+            extract_fields_from_record(&rec, &[0..1, 2..3]),
+            &["Captain", "12345"]
+        );
+        assert_eq!(
+            extract_fields_from_record(&rec, &[0..1, 3..4]),
+            &["Captain"]
+        );
+        assert_eq!(
+            extract_fields_from_record(&rec, &[1..2, 0..1]),
+            &["Sham", "Captain"]
+        );
     }
 
     #[test]
     fn test_extract_chars() {
-        assert_eq!(extract_chars("", &[0..1]), "".to_string());
-        assert_eq!(extract_chars("ábc", &[0..1]), "á".to_string());
-        assert_eq!(extract_chars("ábc", &[0..1, 2..3]), "ác".to_string());
-        assert_eq!(extract_chars("ábc", &[0..3]), "ábc".to_string());
-        assert_eq!(extract_chars("ábc", &[2..3, 1..2]), "cb".to_string());
-        assert_eq!(extract_chars("ábc", &[0..1, 1..2, 4..5]), "áb".to_string());
+        assert_eq!(extract_chars_from_line("", &[0..1]), "".to_string());
+        assert_eq!(extract_chars_from_line("ábc", &[0..1]), "á".to_string());
+        assert_eq!(
+            extract_chars_from_line("ábc", &[0..1, 2..3]),
+            "ác".to_string()
+        );
+        assert_eq!(extract_chars_from_line("ábc", &[0..3]), "ábc".to_string());
+        assert_eq!(
+            extract_chars_from_line("ábc", &[2..3, 1..2]),
+            "cb".to_string()
+        );
+        assert_eq!(
+            extract_chars_from_line("ábc", &[0..1, 1..2, 4..5]),
+            "áb".to_string()
+        );
     }
 
     #[test]
     fn test_extract_bytes() {
-        assert_eq!(extract_bytes("ábc", &[0..1]), "�".to_string());
-        assert_eq!(extract_bytes("ábc", &[0..2]), "á".to_string());
-        assert_eq!(extract_bytes("ábc", &[0..3]), "áb".to_string());
-        assert_eq!(extract_bytes("ábc", &[0..4]), "ábc".to_string());
-        assert_eq!(extract_bytes("ábc", &[3..4, 2..3]), "cb".to_string());
-        assert_eq!(extract_bytes("ábc", &[0..2, 5..6]), "á".to_string());
+        assert_eq!(extract_bytes_from_line("ábc", &[0..1]), "�".to_string());
+        assert_eq!(extract_bytes_from_line("ábc", &[0..2]), "á".to_string());
+        assert_eq!(extract_bytes_from_line("ábc", &[0..3]), "áb".to_string());
+        assert_eq!(extract_bytes_from_line("ábc", &[0..4]), "ábc".to_string());
+        assert_eq!(
+            extract_bytes_from_line("ábc", &[3..4, 2..3]),
+            "cb".to_string()
+        );
+        assert_eq!(
+            extract_bytes_from_line("ábc", &[0..2, 5..6]),
+            "á".to_string()
+        );
     }
 }
