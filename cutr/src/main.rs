@@ -98,41 +98,61 @@ fn do_run(args: CliArguments) -> anyhow::Result<()> {
         _ => unreachable!("Must have --fields, --bytes, or --chars"),
     };
 
+    let handle_field_selection =
+        |filehandle: Box<dyn BufRead>, position_list: &[Range<usize>]| -> anyhow::Result<_> {
+            let mut csv_reader = csv::ReaderBuilder::new()
+                .delimiter(delimiter_byte)
+                .has_headers(false)
+                .from_reader(filehandle);
+
+            let mut csv_writer = csv::WriterBuilder::new()
+                .delimiter(delimiter_byte)
+                .from_writer(io::stdout());
+
+            for record in csv_reader.records() {
+                let record: csv::StringRecord = record?;
+                csv_writer.write_record(extract_fields(&record, position_list))?;
+            }
+
+            Ok(())
+        };
+
+    let handle_byte_selection =
+        |filehandle: Box<dyn BufRead>, position_list: &[Range<usize>]| -> anyhow::Result<_> {
+            for line in filehandle.lines() {
+                let line: &str = &line?;
+                println!("{}", extract_bytes(&line, position_list));
+            }
+
+            Ok(())
+        };
+
+    let handle_char_selection =
+        |filehandle: Box<dyn BufRead>, position_list: &[Range<usize>]| -> anyhow::Result<_> {
+            for line in filehandle.lines() {
+                let line: &str = &line?;
+                println!("{}", extract_chars(&line, position_list));
+            }
+
+            Ok(())
+        };
+
     for filename in &args.files {
         match open_input_file(filename) {
             Err(e) => {
                 // Skips bad files.
                 eprintln!("{}: {}", filename, e);
             }
-            // TODO: Extract handlers to reduce nesting
             Ok(filehandle) => {
                 match &selection_mode {
                     SelectionMode::Fields(position_list) => {
-                        let mut csv_reader = csv::ReaderBuilder::new()
-                            .delimiter(delimiter_byte)
-                            .has_headers(false)
-                            .from_reader(filehandle);
-
-                        let mut csv_writer = csv::WriterBuilder::new()
-                            .delimiter(delimiter_byte)
-                            .from_writer(io::stdout());
-
-                        for record in csv_reader.records() {
-                            let record: csv::StringRecord = record?;
-                            csv_writer.write_record(extract_fields(&record, position_list))?;
-                        }
+                        handle_field_selection(filehandle, position_list)?
                     }
                     SelectionMode::Bytes(position_list) => {
-                        for line in filehandle.lines() {
-                            let line: &str = &line?;
-                            println!("{}", extract_bytes(&line, position_list));
-                        }
+                        handle_byte_selection(filehandle, position_list)?
                     }
                     SelectionMode::Chars(position_list) => {
-                        for line in filehandle.lines() {
-                            let line: &str = &line?;
-                            println!("{}", extract_chars(&line, position_list));
-                        }
+                        handle_char_selection(filehandle, position_list)?
                     }
                 };
             }
