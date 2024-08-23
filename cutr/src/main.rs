@@ -99,23 +99,19 @@ fn do_run(args: CliArguments) -> anyhow::Result<()> {
     };
 
     for filename in &args.files {
-        match open_input_file(filename) {
-            Err(e) => {
+        match (open_input_file(filename), &selection_mode) {
+            (Err(e), _) => {
                 // Skips bad files.
                 eprintln!("{}: {}", filename, e);
             }
-            Ok(filehandle) => {
-                match &selection_mode {
-                    SelectionMode::Fields(position_list) => {
-                        print_selected_fields(filehandle, position_list, delimiter_byte)?
-                    }
-                    SelectionMode::Bytes(position_list) => {
-                        print_selected_bytes(filehandle, position_list)?
-                    }
-                    SelectionMode::Chars(position_list) => {
-                        print_selected_chars(filehandle, position_list)?
-                    }
-                };
+            (Ok(filehandle), SelectionMode::Fields(position_list)) => {
+                print_selected_fields(filehandle, position_list, delimiter_byte)?
+            }
+            (Ok(filehandle), SelectionMode::Bytes(position_list)) => {
+                print_selected_bytes(filehandle, position_list)?
+            }
+            (Ok(filehandle), SelectionMode::Chars(position_list)) => {
+                print_selected_chars(filehandle, position_list)?
             }
         }
     }
