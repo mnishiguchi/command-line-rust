@@ -1,0 +1,38 @@
+#! /bin/bash
+
+printf "\n%s\n" "==> Check where this script is located"
+# https://stackoverflow.com/a/246128/3837223
+this_name="$(basename "$0")"
+this_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
+echo "${this_dir}"
+
+printf "\n%s\n" "==> Make a temporary directory"
+td=$(mktemp -d)
+echo "${td}"
+
+printf "\n%s\n" "==> Find project root directory"
+project_root_dir="${this_dir}/.."
+echo "${project_root_dir}"
+
+printf "\n%s\n" "==> Download the example project to the temporary directory (sparsely)"
+git clone --sparse --depth=1 --filter=blob:none \
+  https://github.com/kyclark/command-line-rust.git \
+  "${td}"
+
+printf "\n%s\n" "==> Copy necessary code from the example project"
+(
+  example_subdir=09_grepr
+
+  cd "${td}" && git sparse-checkout add "${example_subdir}"
+  mv -iv "${example_subdir}/tests" "${project_root_dir}/"
+)
+
+printf "\n%s\n" "==> Clean up the temporary directory"
+rm -rf "${td}" &>/dev/null
+echo "done"
+
+printf "\n%s\n" "==> Install necessary crates"
+cargo add anyhow regex walkdir
+cargo add clap --features derive
+cargo add --dev assert_cmd predicates pretty_assertions rand sys-info
+echo "done"
