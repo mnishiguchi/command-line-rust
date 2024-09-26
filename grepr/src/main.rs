@@ -60,26 +60,58 @@ fn do_run(args: CliArguments) -> anyhow::Result<()> {
         // invalid.
         .map_err(|_| anyhow::anyhow!(r#"Invalid pattern "{}""#, args.pattern))?;
 
-    println!(r#"pattern "{pattern}""#);
+    // println!(r#"pattern "{pattern}""#);
 
     let entries = find_files(&args.files, args.recursive);
+    let file_count = entries.len();
+
+    // Handle the printing of the output with or without the filenames given the number of input
+    // files.
+    let print_result_row = |fname: &str, text: &str| {
+        if file_count > 1 {
+            print!("{fname}:{text}");
+        } else {
+            print!("{text}");
+        }
+    };
 
     for entry in entries {
         match entry {
             Err(e) => {
+                // Print errors like nonexistent files to STDERR.
                 eprintln!("{e}")
             }
             Ok(filename) => {
+                // Attempt to open a file. This might fail due to permissions.
                 match open_input_file(&filename) {
                     Err(e) => {
                         eprintln!("{filename}: {e}")
                     }
                     Ok(filehandle) => {
-                        let matches = find_lines(filehandle, &pattern, args.invert_match);
-                        println!("Found {matches:?}");
+                        // Attempt to find the matching lines of text.
+                        match find_lines(filehandle, &pattern, args.invert_match) {
+                            Err(e) => {
+                                eprintln!("{e}")
+                            }
+                            Ok(matching_lines) => {
+                                // Decide whether to print the number of matches or the matches
+                                // themselves.
+                                if args.count {
+                                    // Print the number of matching lines.
+                                    print_result_row(
+                                        &filename,
+                                        &format!("{}\n", matching_lines.len()),
+                                    );
+                                } else {
+                                    // Print the matching lines themselves.
+                                    for matching_line in &matching_lines {
+                                        print_result_row(&filename, matching_line);
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
-                println!(r#"file "{filename}""#)
             }
         }
     }
